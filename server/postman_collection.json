@@ -1,0 +1,343 @@
+{
+  "info": {
+    "name": "WhatsApp SaaS API",
+    "description": "Production API collection for the WhatsApp SaaS platform. Set `base_url`, `license_key`, `device_fingerprint`, `admin_email`, `admin_password` in the linked environment. Tokens are captured automatically into `client_token` and `admin_token` after the Activate / Admin Login requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://your-app.onrender.com" },
+    { "key": "license_key", "value": "WA-ABCD-EFGH-JKLM-NPQR" },
+    { "key": "device_fingerprint", "value": "postman-device" },
+    { "key": "admin_email", "value": "admin@example.com" },
+    { "key": "admin_password", "value": "change_me" },
+    { "key": "client_token", "value": "" },
+    { "key": "admin_token", "value": "" },
+    { "key": "campaign_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /healthz",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/healthz"
+          }
+        },
+        {
+          "name": "GET /healthz/detailed",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/healthz/detailed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "License",
+      "item": [
+        {
+          "name": "Activate (binds device, returns JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body && body.token) pm.collectionVariables.set('client_token', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/license/activate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"license_key\": \"{{license_key}}\",\n  \"device_fingerprint\": \"{{device_fingerprint}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Validate (rotate JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body && body.token) pm.collectionVariables.set('client_token', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/license/validate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"license_key\": \"{{license_key}}\",\n  \"device_fingerprint\": \"{{device_fingerprint}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/api/license/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Session",
+      "item": [
+        {
+          "name": "Create session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/session/create"
+          }
+        },
+        {
+          "name": "Get QR",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/session/{{license_key}}/qr"
+          }
+        },
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/session/{{license_key}}/status"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/session/{{license_key}}/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Message",
+      "item": [
+        {
+          "name": "Send text",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{client_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/message/send",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"201001234567\",\n  \"text\": \"Hello from Postman 👋\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Send image (URL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{client_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/message/send",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"201001234567\",\n  \"media\": {\n    \"type\": \"url\",\n    \"url\": \"https://picsum.photos/600/400\",\n    \"mime\": \"image/jpeg\",\n    \"caption\": \"Hi {{name}}\"\n  }\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Campaign",
+      "item": [
+        {
+          "name": "Start campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body && body.campaign && body.campaign._id) pm.collectionVariables.set('campaign_id', body.campaign._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{client_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/campaign/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Welcome blast\",\n  \"message_template\": \"Hello {{name}}, welcome!\",\n  \"variations\": [\n    \"Hi {{name}}, glad to have you 👋\",\n    \"Welcome aboard, {{name}}!\"\n  ],\n  \"speed_mode\": \"medium\",\n  \"contacts\": [\n    { \"phone\": \"201001234567\", \"name\": \"Sam\" },\n    { \"phone\": \"201112345678\", \"name\": \"Lina\" }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "List campaigns",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/api/campaign"
+          }
+        },
+        {
+          "name": "Get one campaign",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/api/campaign/{{campaign_id}}"
+          }
+        },
+        {
+          "name": "Report",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/api/campaign/{{campaign_id}}/report"
+          }
+        },
+        {
+          "name": "Pause",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{client_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/campaign/{{campaign_id}}/status",
+            "body": { "mode": "raw", "raw": "{ \"status\": \"paused\" }" }
+          }
+        },
+        {
+          "name": "Resume",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{client_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/campaign/{{campaign_id}}/status",
+            "body": { "mode": "raw", "raw": "{ \"status\": \"running\" }" }
+          }
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{client_token}}" }],
+            "url": "{{base_url}}/api/campaign/{{campaign_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body && body.token) pm.collectionVariables.set('admin_token', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/admin/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/api/admin/stats"
+          }
+        },
+        {
+          "name": "List licenses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/api/admin/licenses"
+          }
+        },
+        {
+          "name": "Create license",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/admin/create-license",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"basic\",\n  \"days_valid\": 30,\n  \"max_messages_per_day\": 500,\n  \"customer_name\": \"Acme\",\n  \"customer_email\": \"ops@acme.test\",\n  \"count\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Revoke license",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/api/admin/license/{{license_key}}/revoke"
+          }
+        },
+        {
+          "name": "Reset device",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/api/admin/license/{{license_key}}/reset-device"
+          }
+        },
+        {
+          "name": "List sessions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/api/admin/sessions"
+          }
+        }
+      ]
+    }
+  ]
+}

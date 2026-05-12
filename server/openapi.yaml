@@ -1,0 +1,759 @@
+openapi: 3.0.3
+info:
+  title: WhatsApp SaaS API
+  version: 3.0.0
+  description: |
+    Cloud backend for the WhatsApp Campaign SaaS platform.
+
+    Two auth surfaces:
+      * **Client JWT** (issued to a license-bound device) for end-customer features.
+      * **Admin JWT** for managing licenses, sessions, and campaigns across tenants.
+
+    All `4xx` / `5xx` responses share a single shape:
+    ```
+    { "ok": false, "error": "...", "code": "...", "request_id": "..." }
+    ```
+
+    Set `X-Request-Id` on requests to correlate with server logs.
+  contact:
+    name: WhatsApp SaaS Ops
+
+servers:
+  - url: https://your-app.onrender.com
+    description: Production (Render)
+  - url: http://localhost:10000
+    description: Local development
+
+tags:
+  - name: Health
+    description: Liveness / readiness probes — public, no auth.
+  - name: License
+    description: License activation, validation, and self-info.
+  - name: Session
+    description: WhatsApp session lifecycle for the authenticated license.
+  - name: Message
+    description: Direct message send (single recipient).
+  - name: Campaign
+    description: Bulk campaign create, monitor, control.
+  - name: Admin
+    description: Tenant management, cross-license operations.
+
+components:
+  securitySchemes:
+    clientJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: License-bound JWT issued by `/api/license/activate` or `/api/license/validate`.
+    adminJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin JWT issued by `/api/admin/login`.
+
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Session id — equals the license key (uppercase).
+    CampaignId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Campaign MongoDB ObjectId.
+
+  schemas:
+    Error:
+      type: object
+      required: [ok, error, code]
+      properties:
+        ok: { type: boolean, example: false }
+        error: { type: string, example: "Invalid credentials" }
+        code: { type: string, example: "UNAUTHORIZED" }
+        request_id: { type: string, example: "61d264f67aca1457" }
+
+    HealthOk:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+
+    HealthDetailed:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        ts: { type: integer, example: 1700000000000 }
+        version: { type: string, example: "3.0.0" }
+        mongo:
+          type: object
+          properties:
+            connected: { type: boolean }
+            last_error: { type: string, nullable: true }
+            latency_ms: { type: number, nullable: true }
+        sessions:
+          type: object
+          properties:
+            count: { type: integer }
+            connected: { type: integer }
+        memory:
+          type: object
+          properties:
+            rss_mb: { type: number }
+            heap_used_mb: { type: number }
+            heap_total_mb: { type: number }
+        uptime_sec: { type: integer }
+        node: { type: string }
+        config: { type: object }
+
+    License:
+      type: object
+      properties:
+        license_key: { type: string, example: "WA-ABCD-EFGH-JKLM-NPQR" }
+        plan: { type: string, enum: [basic, pro, enterprise] }
+        status: { type: string, enum: [inactive, active, expired, revoked] }
+        expires_at: { type: string, format: date-time }
+        activated_at: { type: string, format: date-time, nullable: true }
+        max_messages_per_day: { type: integer, example: 500 }
+
+    ActivateRequest:
+      type: object
+      required: [license_key, device_fingerprint]
+      properties:
+        license_key: { type: string, example: "WA-ABCD-EFGH-JKLM-NPQR" }
+        device_fingerprint:
+          type: string
+          example: "sha256:e3b0c44298fc1c149afbf4c8996fb924"
+
+    TokenResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        token: { type: string, description: JWT bearer token }
+        license: { $ref: '#/components/schemas/License' }
+
+    SessionStatus:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        session_id: { type: string }
+        status:
+          type: string
+          enum: [idle, initializing, awaiting_qr, connected, disconnected, logged_out, error]
+        wa_id: { type: string }
+        push_name: { type: string }
+        has_qr: { type: boolean }
+        last_error: { type: string }
+        reconnect_attempts: { type: integer }
+
+    SessionQR:
+      type: object
+      properties:
+        ok: { type: boolean }
+        session_id: { type: string }
+        qr: { type: string, nullable: true, description: Raw QR payload (string) }
+        qrDataUrl:
+          type: string
+          nullable: true
+          description: Base64 data-url PNG of the QR for direct rendering
+        status: { type: string }
+        message: { type: string, nullable: true }
+
+    MessageSendRequest:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+          example: "201001234567"
+          description: Digits only. Egyptian numbers should be 12 digits starting `20`.
+        text:
+          type: string
+          example: "Hello {{name}}"
+        media:
+          type: object
+          properties:
+            type: { type: string, enum: [url, dataUrl, path] }
+            url: { type: string }
+            dataUrl: { type: string }
+            mime: { type: string, example: "image/png" }
+            filename: { type: string }
+            caption: { type: string }
+            asDocument: { type: boolean }
+
+    MessageSendResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        message_id: { type: string, nullable: true }
+        to: { type: string }
+        timestamp: { type: integer }
+
+    CampaignContact:
+      type: object
+      required: [phone]
+      properties:
+        phone: { type: string, example: "201001234567" }
+        name: { type: string, example: "Sam" }
+        vars: { type: object, additionalProperties: true }
+        risk_level: { type: string, enum: [green, yellow, red, unknown] }
+        on_whatsapp: { type: boolean, nullable: true }
+
+    CampaignStartRequest:
+      type: object
+      required: [name, message_template, contacts]
+      properties:
+        name: { type: string }
+        message_template:
+          type: string
+          example: "Hello {{name}}, your order is ready."
+        variations:
+          type: array
+          items: { type: string }
+        media: { type: object }
+        speed_mode: { type: string, enum: [safe, medium, fast, custom], default: medium }
+        delay_min_seconds: { type: integer, minimum: 5 }
+        delay_max_seconds: { type: integer }
+        warmup:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            day1: { type: integer }
+            day_step: { type: integer }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/CampaignContact' }
+
+    CampaignSummary:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [draft, queued, running, paused, completed, failed] }
+        progress:
+          type: object
+          properties:
+            total: { type: integer }
+            sent: { type: integer }
+            failed: { type: integer }
+            skipped: { type: integer }
+        speed_mode: { type: string }
+        delay_min_seconds: { type: integer }
+        delay_max_seconds: { type: integer }
+        has_media: { type: boolean }
+        variations_count: { type: integer }
+        sent_today: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+
+    CreateLicenseRequest:
+      type: object
+      properties:
+        plan: { type: string, enum: [basic, pro, enterprise], default: basic }
+        days_valid: { type: integer, default: 30 }
+        max_messages_per_day: { type: integer, default: 500 }
+        customer_name: { type: string }
+        customer_email: { type: string, format: email }
+        notes: { type: string }
+        count: { type: integer, minimum: 1, maximum: 100, default: 1 }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Token does not permit this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflict (e.g. WhatsApp session not connected)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServiceUnavailable:
+      description: Dependency unavailable (Mongo down, JWT secret unset, etc.)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Banner
+      description: Plain-text banner. Always 200 regardless of dependency state.
+      responses:
+        '200':
+          description: API alive
+          content:
+            text/plain: { schema: { type: string, example: "API is running 🚀" } }
+
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness
+      description: Render/Railway healthcheck. Always 200 even if Mongo or sessions are not ready.
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain: { schema: { type: string, example: OK } }
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness (JSON)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/HealthOk' } }
+
+  /healthz/detailed:
+    get:
+      tags: [Health]
+      summary: Detailed health
+      description: Memory, uptime, Mongo latency, session counters, masked config.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/HealthDetailed' } }
+
+  /api/license/activate:
+    post:
+      tags: [License]
+      summary: Activate license / bind device
+      description: |
+        First-time activation binds the device fingerprint permanently.
+        Subsequent calls from the same fingerprint are idempotent and rotate the JWT.
+        Calls from a different fingerprint are rejected with 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivateRequest' }
+      responses:
+        '200':
+          description: Token + license info
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/license/validate:
+    post:
+      tags: [License]
+      summary: Refresh JWT
+      description: Re-validates fingerprint + license state and returns a fresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivateRequest' }
+      responses:
+        '200':
+          description: Fresh token
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/license/me:
+    get:
+      tags: [License]
+      summary: Self-info
+      security: [{ clientJWT: [] }]
+      responses:
+        '200':
+          description: License info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  license: { $ref: '#/components/schemas/License' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /session/create:
+    post:
+      tags: [Session]
+      summary: Start WhatsApp session
+      description: Spawns a Baileys socket for the authenticated license. Idempotent.
+      security: [{ clientJWT: [] }]
+      responses:
+        '201':
+          description: Session started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  session_id: { type: string }
+                  status: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /session/{id}/qr:
+    get:
+      tags: [Session]
+      summary: Get pairing QR
+      security: [{ clientJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/SessionId' } ]
+      responses:
+        '200':
+          description: QR (may be null if not ready / already connected)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/SessionQR' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /session/{id}/status:
+    get:
+      tags: [Session]
+      summary: Session status
+      security: [{ clientJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/SessionId' } ]
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/SessionStatus' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /session/{id}/logout:
+    post:
+      tags: [Session]
+      summary: Log out + wipe stored auth
+      security: [{ clientJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/SessionId' } ]
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  session_id: { type: string }
+                  status: { type: string, example: logged_out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /message/send:
+    post:
+      tags: [Message]
+      summary: Send a message (text and/or media)
+      description: |
+        Serialised per session — concurrent calls queue inside the manager so
+        ratchet state cannot race. Returns 409 if the session is not currently
+        connected; the caller should poll `/session/:id/status` first.
+      security: [{ clientJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageSendRequest' }
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/MessageSendResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/campaign/start:
+    post:
+      tags: [Campaign]
+      summary: Create + queue a campaign
+      description: |
+        Creates the campaign, sanitises contacts (dedupe, normalize phones),
+        and starts a server-side worker that will send according to the
+        configured speed_mode + warmup.
+      security: [{ clientJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CampaignStartRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/campaign:
+    get:
+      tags: [Campaign]
+      summary: List my campaigns
+      security: [{ clientJWT: [] }]
+      responses:
+        '200':
+          description: Up to 100 most recent campaigns (no contact arrays).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  campaigns:
+                    type: array
+                    items: { $ref: '#/components/schemas/CampaignSummary' }
+
+  /api/campaign/{id}:
+    parameters: [ { $ref: '#/components/parameters/CampaignId' } ]
+    get:
+      tags: [Campaign]
+      summary: Get one campaign (with contacts)
+      security: [{ clientJWT: [] }]
+      responses:
+        '200': { description: Found }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Campaign]
+      summary: Delete campaign + stop worker
+      security: [{ clientJWT: [] }]
+      responses:
+        '200': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/campaign/{id}/report:
+    get:
+      tags: [Campaign]
+      summary: Per-contact delivery report
+      security: [{ clientJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/CampaignId' } ]
+      responses:
+        '200': { description: Buckets of sent / failed / skipped / pending contacts }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/campaign/{id}/status:
+    patch:
+      tags: [Campaign]
+      summary: Pause / resume campaign
+      security: [{ clientJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/CampaignId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [paused, running, queued] }
+      responses:
+        '200': { description: Updated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/campaign/{id}/risk:
+    patch:
+      tags: [Campaign]
+      summary: Bulk update contact risk levels
+      security: [{ clientJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/CampaignId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      phone: { type: string }
+                      risk_level: { type: string, enum: [green, yellow, red, unknown] }
+                      on_whatsapp: { type: boolean }
+      responses:
+        '200': { description: Touched count returned }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/admin/login:
+    post:
+      tags: [Admin]
+      summary: Admin login
+      description: |
+        5 failed attempts trigger a 15-minute account lock. Lock resets on any
+        successful login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminLoginRequest' }
+      responses:
+        '200':
+          description: Admin JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  token: { type: string }
+                  admin:
+                    type: object
+                    properties:
+                      email: { type: string }
+                      role: { type: string, enum: [admin, superadmin] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: Tenant + platform counters
+      security: [{ adminJWT: [] }]
+      responses:
+        '200':
+          description: Counters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  stats:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      active: { type: integer }
+                      expired: { type: integer }
+                      revoked: { type: integer }
+                      inactive: { type: integer }
+                      totalCampaigns: { type: integer }
+                      totalSessions: { type: integer }
+
+  /api/admin/licenses:
+    get:
+      tags: [Admin]
+      summary: List licenses (paginated, max 500)
+      security: [{ adminJWT: [] }]
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [inactive, active, expired, revoked] }
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        '200': { description: Up to 500 most recent matching licenses }
+
+  /api/admin/create-license:
+    post:
+      tags: [Admin]
+      summary: Create one or many licenses
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateLicenseRequest' }
+      responses:
+        '201': { description: Licenses returned }
+
+  /api/admin/license/{key}/revoke:
+    patch:
+      tags: [Admin]
+      summary: Revoke a license
+      security: [{ adminJWT: [] }]
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Revoked }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/admin/license/{key}/reset-device:
+    patch:
+      tags: [Admin]
+      summary: Unbind device (allows re-activation on a new device)
+      security: [{ adminJWT: [] }]
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Reset }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/admin/sessions:
+    get:
+      tags: [Admin]
+      summary: List in-memory WhatsApp sessions
+      security: [{ adminJWT: [] }]
+      responses:
+        '200': { description: Sessions list }
+
+  /api/admin/sessions/{id}:
+    get:
+      tags: [Admin]
+      summary: Get session detail
+      security: [{ adminJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/SessionId' } ]
+      responses:
+        '200': { description: Session status + persisted record }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/admin/sessions/{id}/logout:
+    post:
+      tags: [Admin]
+      summary: Force-logout a session
+      security: [{ adminJWT: [] }]
+      parameters: [ { $ref: '#/components/parameters/SessionId' } ]
+      responses:
+        '200': { description: Logged out }

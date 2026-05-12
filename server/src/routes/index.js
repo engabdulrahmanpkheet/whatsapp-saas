@@ -22,6 +22,7 @@ const adminRoutes = require('./admin.routes');
 const campaignRoutes = require('./campaign.routes');
 const sessionRoutes = require('./session.routes');
 const messageRoutes = require('./message.routes');
+const docsRoutes = require('./docs.routes');
 
 const router = express.Router();
 
@@ -40,5 +41,8 @@ router.use('/api/campaign', campaignRoutes);
 // New WhatsApp engine endpoints
 router.use('/session', sessionRoutes);
 router.use('/message', messageRoutes);
+
+// Interactive API documentation (Swagger UI + raw OpenAPI spec).
+router.use('/api/docs', docsRoutes);
 
 module.exports = router;

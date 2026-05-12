@@ -107,4 +107,19 @@ function lastErrorMessage() {
   return lastError;
 }
 
-module.exports = { connectDB, disconnectDB, isHealthy, lastErrorMessage };
+/**
+ * Round-trip ping against Mongo. Returns latency in ms or null if unreachable.
+ * Used by /healthz/detailed — never throws.
+ */
+async function pingLatency() {
+  if (!isHealthy()) return null;
+  try {
+    const start = process.hrtime.bigint();
+    await mongoose.connection.db.admin().ping();
+    return Number(process.hrtime.bigint() - start) / 1e6;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { connectDB, disconnectDB, isHealthy, lastErrorMessage, pingLatency };

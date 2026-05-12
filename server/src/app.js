@@ -12,6 +12,7 @@
 
 const express = require('express');
 const morgan = require('morgan');
+const compression = require('compression');
 
 const env = require('./config/env');
 const logger = require('./utils/logger');
@@ -28,6 +29,10 @@ function buildApp() {
   const app = express();
 
   applySecurity(app);
+
+  // gzip/deflate compression for JSON responses. Tiny CPU, big bandwidth win
+  // for /healthz/detailed, campaign listings, OpenAPI spec, etc.
+  app.use(compression());
 
   // Correlation id BEFORE anything else so all logs / errors carry it.
   app.use(requestId);
