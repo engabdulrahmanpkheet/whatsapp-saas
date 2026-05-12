@@ -1,17 +1,19 @@
 {
   "name": "whatsapp-saas-server",
-  "version": "2.0.0",
-  "description": "Cloud backend for WhatsApp Campaign SaaS",
-  "main": "app.js",
+  "version": "3.0.0",
+  "description": "Cloud backend for WhatsApp Campaign SaaS — Baileys engine, license + queue, MongoDB Atlas",
+  "main": "src/server.js",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "seed:admin": "node utils/seedAdmin.js"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed:admin": "node src/utils/seedAdmin.js",
+    "syntax-check": "find src -name '*.js' -not -path '*/node_modules/*' -exec node --check {} +"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.8",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -20,7 +22,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
