@@ -1,16 +1,32 @@
 'use strict';
 
+/**
+ * Auth middleware.
+ *
+ * Production hardening notes:
+ * - If JWT secrets aren't configured we DO NOT silently accept tokens.
+ *   We return 503 SERVICE_UNAVAILABLE so misconfiguration is obvious.
+ * - DB-dependent paths (clientAuth) return 503 if Mongo is currently down,
+ *   instead of hanging on a buffered query.
+ */
+
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const License = require('../models/license.model');
-const { unauthorized, forbidden } = require('../utils/AppError');
+const { isHealthy } = require('../config/db');
+const { unauthorized, forbidden, AppError } = require('../utils/AppError');
 
 function bearer(req) {
   const h = req.headers.authorization || '';
   return h.startsWith('Bearer ') ? h.slice(7).trim() : null;
 }
 
+function unavailable(reason) {
+  return new AppError(reason, 503, 'SERVICE_UNAVAILABLE');
+}
+
 function adminAuth(req, _res, next) {
+  if (!env.ADMIN_JWT_SECRET) return next(unavailable('Admin auth not configured'));
   const token = bearer(req);
   if (!token) return next(unauthorized('Missing token'));
   try {
@@ -24,6 +40,9 @@ function adminAuth(req, _res, next) {
 }
 
 async function clientAuth(req, _res, next) {
+  if (!env.JWT_SECRET) return next(unavailable('Client auth not configured'));
+  if (!isHealthy()) return next(unavailable('Database temporarily unavailable'));
+
   const token = bearer(req);
   if (!token) return next(unauthorized('Missing token'));
 

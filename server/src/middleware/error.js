@@ -13,7 +13,13 @@ function errorHandler(err, req, res, _next) {
   const status = err.status || (isApp ? err.status : 500);
   const code = err.code || (isApp ? err.code : 'INTERNAL');
 
-  if (status >= 500) {
+  if (status === 503 || (status >= 500 && status < 600 && isApp)) {
+    // 5xx that we deliberately raised (e.g. SERVICE_UNAVAILABLE) — warn only.
+    logger.warn(
+      { method: req.method, path: req.originalUrl, status, code, err: err.message },
+      'service-level error'
+    );
+  } else if (status >= 500) {
     logger.error(
       { method: req.method, path: req.originalUrl, err: err.message, stack: err.stack, code },
       'unhandled request error'

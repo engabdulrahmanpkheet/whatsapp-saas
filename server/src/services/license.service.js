@@ -4,8 +4,13 @@ const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const License = require('../models/license.model');
 const generateLicenseKey = require('../utils/generateLicenseKey');
+const { AppError } = require('../utils/AppError');
 
 function signClientToken(licenseKey, fingerprint) {
+  if (!env.JWT_SECRET) {
+    // Surface missing config as a 503 instead of letting jwt.sign throw 500.
+    throw new AppError('Client auth not configured (JWT_SECRET missing)', 503, 'SERVICE_UNAVAILABLE');
+  }
   return jwt.sign(
     { license_key: licenseKey, fp: fingerprint },
     env.JWT_SECRET,

@@ -8,9 +8,12 @@ const License = require('../models/license.model');
 const Campaign = require('../models/campaign.model');
 const SessionModel = require('../models/session.model');
 const { createLicense } = require('../services/license.service');
-const { bad, unauthorized, notFound } = require('../utils/AppError');
+const { bad, unauthorized, notFound, AppError } = require('../utils/AppError');
 
 exports.login = asyncHandler(async (req, res) => {
+  if (!env.ADMIN_JWT_SECRET) {
+    throw new AppError('Admin auth not configured (ADMIN_JWT_SECRET missing)', 503, 'SERVICE_UNAVAILABLE');
+  }
   const { email, password } = req.body || {};
   if (!email || !password) throw bad('email and password required');
 

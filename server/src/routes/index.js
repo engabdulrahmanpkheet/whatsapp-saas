@@ -1,7 +1,21 @@
 'use strict';
 
+/**
+ * Top-level router.
+ *
+ * Public/no-auth endpoints:
+ *   GET /            — banner ("API is running 🚀")
+ *   GET /healthz     — Render/standard healthcheck ("OK")
+ *   GET /health      — JSON variant, alias of /healthz
+ *   GET /api/health  — legacy alias kept for old clients
+ *
+ * Authenticated endpoints live under /api/* (license, admin, campaign) and
+ * the new /session, /message namespaces.
+ */
+
 const express = require('express');
 
+const healthCtrl = require('../controllers/health.controller');
 const healthRoutes = require('./health.routes');
 const licenseRoutes = require('./license.routes');
 const adminRoutes = require('./admin.routes');
@@ -11,10 +25,13 @@ const messageRoutes = require('./message.routes');
 
 const router = express.Router();
 
-// Root health (Railway healthcheck)
-router.use('/health', healthRoutes);
+// Public, unconditionally-200 endpoints (platform healthchecks)
+router.get('/', healthCtrl.root);
+router.get('/healthz', healthCtrl.healthz);
+router.get('/health', healthCtrl.healthzJson);
+router.use('/healthz', healthRoutes); // exposes /healthz/detailed too
 
-// Legacy API path kept for backwards-compat with admin dashboard
+// Legacy API path kept for backwards-compat with the admin dashboard
 router.use('/api/health', healthRoutes);
 router.use('/api/license', licenseRoutes);
 router.use('/api/admin', adminRoutes);

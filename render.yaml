@@ -1,0 +1,48 @@
+# Render blueprint — `render.yaml`
+#
+# Deploys the server/ directory as a Node web service. Mongo Atlas is expected
+# to be provisioned externally; set MONGO_URI in the Render dashboard.
+# Healthcheck uses /healthz (Render convention).
+services:
+  - type: web
+    name: whatsapp-saas-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT automatically; do not hardcode.
+      - key: MONGO_URI
+        sync: false            # set in Render dashboard (Atlas SRV)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: ADMIN_JWT_EXPIRES_IN
+        value: 7d
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+      - key: DEFAULT_MIN_DELAY_SEC
+        value: "8"
+      - key: DEFAULT_MAX_DELAY_SEC
+        value: "20"
+      - key: HARD_MIN_DELAY_SEC
+        value: "5"
+      - key: WA_AUTH_STORE
+        value: mongo
+      - key: WA_MAX_SESSIONS
+        value: "50"
