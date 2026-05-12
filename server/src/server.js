@@ -32,17 +32,20 @@ process.on('unhandledRejection', (reason) => {
 });
 
 function startupBanner() {
+  // Pretty multi-line banner — operator-friendly, secrets masked.
+  env.printStartupBanner();
+  // Also emit a single structured log line so log aggregators capture it.
   logger.info(
-    { env: env.NODE_ENV, port: env.PORT, node: process.version, version: require('../package.json').version },
+    {
+      env: env.NODE_ENV,
+      port: env.PORT,
+      node: process.version,
+      version: require('../package.json').version,
+      missing: env.MISSING,
+      warnings_count: env.WARNINGS.length,
+    },
     'starting WhatsApp SaaS API'
   );
-  if (env.MISSING.length) {
-    logger.warn(
-      { missing: env.MISSING },
-      'required environment variables not set — dependent endpoints will return 503'
-    );
-  }
-  for (const w of env.WARNINGS) logger.warn(w);
 }
 
 async function restoreSessionsAsync() {

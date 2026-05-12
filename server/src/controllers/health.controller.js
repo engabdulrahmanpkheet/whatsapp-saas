@@ -29,20 +29,14 @@ exports.healthzJson = (_req, res) => {
 
 exports.detailed = (_req, res) => {
   const sessions = manager.list();
+  const diagnostics = env.getDiagnostics();
   res.status(200).json({
     status: 'ok',
     ts: Date.now(),
     version: require('../../package.json').version,
-    env: env.NODE_ENV,
-    port: env.PORT,
     mongo: {
       connected: isHealthy(),
       last_error: lastErrorMessage() || null,
-    },
-    config: {
-      missing: env.MISSING,
-      warnings: env.WARNINGS,
-      ok: env.CONFIG_OK,
     },
     sessions: {
       count: sessions.length,
@@ -50,5 +44,8 @@ exports.detailed = (_req, res) => {
     },
     uptime_sec: Math.floor(process.uptime()),
     node: process.version,
+    // Full env diagnostics (secrets masked) — operators can see what the
+    // process actually loaded without inspecting Render/Railway dashboards.
+    config: diagnostics,
   });
 };
