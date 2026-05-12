@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Login — WhatsApp SaaS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="card login-card">
+      <div class="brand">📨 Admin Panel</div>
+      <div class="subtitle">WhatsApp Campaign SaaS</div>
+
+      <div class="field">
+        <label>API URL</label>
+        <input id="apiUrl" type="text" placeholder="http://localhost:4000">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="email" type="email" placeholder="admin@local.test">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="password" type="password">
+      </div>
+
+      <button id="loginBtn" style="width:100%">Login</button>
+      <div id="msg"></div>
+    </div>
+  </div>
+  <script src="login.js"></script>
+</body>
+</html>

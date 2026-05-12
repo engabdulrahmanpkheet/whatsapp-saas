@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:;">
+  <title>WhatsApp Campaign Pro</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">📨 Campaign Pro</div>
+      <div id="navWA"        class="nav-item active">WhatsApp</div>
+      <div id="navContacts"  class="nav-item">Contacts</div>
+      <div id="navNew"       class="nav-item">New Campaign</div>
+      <div id="navCampaigns" class="nav-item">Campaigns</div>
+      <div id="navGroups"    class="nav-item">Groups</div>
+      <div id="navBlacklist" class="nav-item">Blacklist</div>
+
+      <div class="footer">
+        <div id="licInfo" style="margin-bottom:10px"></div>
+        <div id="waStatus" class="status-pill"><span class="dot"></span><span>WhatsApp: disconnected</span></div>
+        <div style="margin-top:10px"><button id="logoutBtn" class="secondary" style="width:100%">Logout</button></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="licBanner" class="banner-warn" style="display:none"></div>
+
+      <!-- ========== WhatsApp ========== -->
+      <section id="pageWA">
+        <div class="page-title">WhatsApp Connection</div>
+
+        <!-- Live status banner — always visible on this page -->
+        <div id="waStatusBanner" class="status-banner" style="display:none">
+          <div class="status-banner-row">
+            <div class="spinner" id="waSpinner"></div>
+            <div style="flex:1">
+              <div id="waStatusTitle" style="font-weight:600">Initializing…</div>
+              <div id="waStatusSubtitle" class="muted" style="font-size:13px"></div>
+              <div id="waStatusProgress" class="progress" style="margin-top:8px; display:none">
+                <div id="waStatusProgressBar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account card (post-login) -->
+        <div id="accountCard" class="card" style="display:none; margin-bottom:14px">
+          <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+            <div class="avatar-wrap">
+              <img id="accAvatar" alt="" style="display:none">
+              <div id="accAvatarFallback" class="avatar-circle">📱</div>
+            </div>
+            <div style="flex:1; min-width:200px">
+              <div id="accName" style="font-size:18px; font-weight:600">—</div>
+              <div id="accPhone" class="muted" style="margin-top:2px">—</div>
+              <div style="margin-top:4px"><span class="dot green"></span>
+                <span style="color:var(--accent); font-weight:500">Connected</span>
+              </div>
+            </div>
+            <div class="action-cluster">
+              <button id="waViewBtn">📺 Open WhatsApp</button>
+              <button id="waBackBtn" class="secondary" style="display:none">← Back to Dashboard</button>
+              <button id="waRestartBtn" class="secondary">🔄 Restart</button>
+              <button id="waClearBtn" class="secondary">🧹 Reset Session</button>
+              <button id="waDisconnectBtn" class="danger">Disconnect</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- QR card (pre-login) -->
+        <div id="qrCard" class="card">
+          <p class="muted">Scan the QR code with your phone. WhatsApp → Settings → Linked Devices → Link a Device.</p>
+          <div id="qrContainer" class="qr-box" style="display:none"><img id="qrImg" alt="QR code"></div>
+          <div id="waMsg" class="muted" style="margin-top:14px">Click "Connect" to begin.</div>
+          <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap">
+            <button id="waStartBtn">Connect WhatsApp</button>
+            <button id="waClearBtn2" class="secondary" style="display:none">🧹 Clear Stale Session</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== Contacts (import + clean + validate) ========== -->
+      <section id="pageContacts" style="display:none">
+        <div class="page-title">Contacts</div>
+        <div class="card">
+          <div class="toolbar">
+            <button id="ctPickFile">📂 Import Excel/CSV</button>
+            <button id="ctPasteBtn" class="secondary">📝 Paste manually</button>
+            <button id="ctValidateBtn" class="secondary" disabled>🔍 Check WhatsApp numbers</button>
+            <div class="spacer"></div>
+            <select id="ctFilter">
+              <option value="all">All</option>
+              <option value="valid">Valid only</option>
+              <option value="invalid">Invalid only</option>
+              <option value="green">Safe (green)</option>
+              <option value="yellow">Medium risk (yellow)</option>
+              <option value="red">High risk (red)</option>
+            </select>
+            <button id="ctClearBtn" class="secondary">Clear</button>
+          </div>
+
+          <div id="ctSummary" class="contacts-summary" style="display:none"></div>
+          <div id="ctValidateProgress" style="display:none; margin-top:10px">
+            <div class="muted" id="ctValidateLabel" style="margin-bottom:6px">Validating…</div>
+            <div class="progress"><div id="ctValidateBar" style="width:0%"></div></div>
+          </div>
+
+          <div id="ctTableWrap" style="margin-top:14px; max-height:520px; overflow-y:auto">
+            <table id="ctTable">
+              <thead>
+                <tr>
+                  <th style="width:34px"><input type="checkbox" id="ctSelectAll" checked></th>
+                  <th>Phone (normalized)</th>
+                  <th>Original</th>
+                  <th>Name</th>
+                  <th>Validation</th>
+                  <th>Risk</th>
+                </tr>
+              </thead>
+              <tbody id="ctRows"><tr><td colspan="6" class="muted">No contacts loaded.</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="contacts-summary" style="margin-top:14px">
+            <strong id="ctSelectedCount">0</strong> contacts selected for the next campaign.
+          </div>
+        </div>
+
+        <!-- Manual paste modal -->
+        <div id="pasteModal" class="modal-backdrop" style="display:none">
+          <div class="card modal">
+            <h3 style="margin-top:0">Paste contacts manually</h3>
+            <p class="muted">One per line. Format: <code>phone,name</code> or just <code>phone</code>.</p>
+            <textarea id="ctPasteArea" rows="10"
+              placeholder="01001234567,Ahmed&#10;01112223344,Sara&#10;201556667788"></textarea>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px">
+              <button id="pasteCancel" class="secondary">Cancel</button>
+              <button id="pasteApply">Add</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== New Campaign ========== -->
+      <section id="pageNew" style="display:none">
+        <div class="page-title">New Campaign</div>
+        <div class="card">
+          <div class="field">
+            <label>Campaign Name</label>
+            <input id="ncName" type="text" placeholder="e.g. Black Friday — VIP list">
+          </div>
+
+          <div class="field">
+            <label>Message Template</label>
+            <textarea id="ncMessage" rows="4"
+              placeholder="Hi {{name}}, our Black Friday deals are live. Reply YES for the link."></textarea>
+            <div class="muted" style="margin-top:6px; font-size:12px">
+              Variables: <code>{{name}}</code>, <code>{{phone}}</code>, plus any custom column from Excel as <code>{{column_name}}</code>.
+            </div>
+          </div>
+
+          <!-- Variations -->
+          <div class="field">
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <label style="margin:0">Message Variations <span class="muted" style="text-transform:none; font-weight:400">(optional, anti-spam)</span></label>
+              <button id="ncAddVar" class="secondary" style="padding:4px 10px; font-size:12px">+ Add variation</button>
+            </div>
+            <div id="ncVariations" style="margin-top:8px"></div>
+            <div class="muted" style="font-size:12px; margin-top:6px">
+              If you add variations, the system randomly picks one per send. Reduces spam-detection risk.
+            </div>
+          </div>
+
+          <!-- Media -->
+          <div class="field">
+            <label>Attach Media (optional)</label>
+            <div id="ncMediaArea" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+              <button id="ncPickMedia" class="secondary">📎 Choose file…</button>
+              <span id="ncMediaName" class="muted">No file attached</span>
+              <button id="ncRemoveMedia" class="secondary" style="display:none">✕ Remove</button>
+            </div>
+            <div id="ncMediaPreview" style="margin-top:10px; display:none"></div>
+          </div>
+
+          <!-- Speed -->
+          <div class="row">
+            <div class="field">
+              <label>Sending Speed</label>
+              <select id="ncSpeed">
+                <option value="safe">🔒 Safe — 15-25s delay (safest for new accounts)</option>
+                <option value="medium" selected>✅ Normal — 8-15s delay (recommended)</option>
+                <option value="fast">⚠ Fast — 3-5s delay (high ban risk)</option>
+                <option value="custom">⚙ Custom</option>
+              </select>
+              <div id="ncSpeedNote" class="speed-note">Balanced for most campaigns. Suitable for warmed-up accounts.</div>
+            </div>
+            <div class="field">
+              <label>Daily Message Limit</label>
+              <input id="ncDailyLimit" type="number" min="0" placeholder="from license">
+              <div class="muted" style="font-size:12px; margin-top:4px">Leave empty to use license cap.</div>
+            </div>
+          </div>
+
+          <div class="field" style="display:flex; gap:18px; flex-wrap:wrap">
+            <label style="display:flex; gap:8px; align-items:center; margin:0">
+              <input id="ncSimulateTyping" type="checkbox" style="width:auto" checked> Simulate typing before send (anti-ban)
+            </label>
+            <label style="display:flex; gap:8px; align-items:center; margin:0">
+              <input id="ncSafeOnly" type="checkbox" style="width:auto"> Safe Mode — send to green-marked numbers only
+            </label>
+          </div>
+
+          <div id="ncCustomDelays" class="row" style="display:none">
+            <div class="field">
+              <label>Min delay (sec)</label>
+              <input id="ncDelayMin" type="number" min="5" value="8">
+            </div>
+            <div class="field">
+              <label>Max delay (sec)</label>
+              <input id="ncDelayMax" type="number" min="5" value="20">
+            </div>
+          </div>
+
+          <!-- Warm-up -->
+          <div class="field">
+            <label style="display:flex; gap:8px; align-items:center">
+              <input id="ncWarmup" type="checkbox" style="width:auto"> Warm-up mode (gradual ramp)
+            </label>
+            <div id="ncWarmupRow" class="row" style="display:none; margin-top:10px">
+              <div class="field" style="margin:0">
+                <label>Day 1 limit</label>
+                <input id="ncWarmupDay1" type="number" min="1" value="20">
+              </div>
+              <div class="field" style="margin:0">
+                <label>Increase per day</label>
+                <input id="ncWarmupStep" type="number" min="0" value="30">
+              </div>
+            </div>
+            <div class="muted" style="font-size:12px; margin-top:6px">
+              Recommended for new numbers — start at 20/day, add 30/day. Day 1: 20, Day 2: 50, Day 3: 80…
+            </div>
+          </div>
+
+          <!-- Contacts source -->
+          <label>Contacts</label>
+          <div class="contacts-summary" id="ncContactsInfo">
+            No contacts loaded. Go to <strong>Contacts</strong> tab to import or paste.
+          </div>
+
+          <button id="ncCreateBtn" style="margin-top:14px">Preview Campaign</button>
+          <div id="ncMsg"></div>
+        </div>
+      </section>
+
+      <!-- ========== Campaigns list + detail ========== -->
+      <section id="pageCampaigns" style="display:none">
+        <div class="page-title">Campaigns</div>
+        <div class="card">
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr>
+                <th>Name</th><th>Status</th><th>Speed</th>
+                <th>Progress</th><th>Today</th><th>Created</th><th></th>
+              </tr></thead>
+              <tbody id="campaignsBody"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="campaignDetail" class="card" style="margin-top:18px; display:none">
+          <h3 id="cdName"></h3>
+          <div class="row">
+            <div>
+              <label>Status</label>
+              <div id="cdStatus"></div>
+            </div>
+            <div>
+              <label>Progress</label>
+              <div id="cdProgressText" class="muted"></div>
+              <div class="progress" style="margin-top:6px"><div id="cdProgressBar" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:14px">
+            <div class="stat-mini"><div class="label">Total</div><div class="value" id="cdTotal">0</div></div>
+            <div class="stat-mini"><div class="label">Sent</div><div class="value green" id="cdSent">0</div></div>
+            <div class="stat-mini"><div class="label">Failed</div><div class="value red" id="cdFailed">0</div></div>
+            <div class="stat-mini"><div class="label">Skipped</div><div class="value amber" id="cdSkipped">0</div></div>
+            <div class="stat-mini"><div class="label">Remaining</div><div class="value" id="cdRemaining">0</div></div>
+          </div>
+
+          <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap">
+            <button id="cdRunBtn">▶ Start Sending</button>
+            <button id="cdStopBtn" class="secondary">⏸ Stop</button>
+            <button id="cdRefreshBtn" class="secondary">⟳ Refresh</button>
+            <button id="cdReportBtn" class="secondary">📄 Full Report</button>
+            <button id="cdDeleteBtn" class="danger" style="margin-left:auto">Delete</button>
+          </div>
+
+          <div style="margin-top:18px">
+            <label>Live Log</label>
+            <div id="cdLogs" class="logs"></div>
+          </div>
+        </div>
+
+        <!-- Report modal -->
+        <div id="reportModal" class="modal-backdrop" style="display:none">
+          <div class="card modal" style="width:720px">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <h3 style="margin:0" id="rmTitle">Campaign Report</h3>
+              <button id="rmClose" class="secondary" style="padding:4px 10px">✕</button>
+            </div>
+            <div class="tabs" style="margin-top:14px">
+              <div class="tab active" data-bucket="sent">Sent</div>
+              <div class="tab" data-bucket="failed">Failed</div>
+              <div class="tab" data-bucket="skipped">Skipped</div>
+              <div class="tab" data-bucket="pending">Pending</div>
+            </div>
+            <div id="rmTableWrap" style="max-height:420px; overflow-y:auto">
+              <table>
+                <thead><tr><th>Phone</th><th>Name</th><th>Risk</th><th>Time / Reason</th></tr></thead>
+                <tbody id="rmRows"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end">
+              <button id="rmExportBtn" class="secondary">Export CSV</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== Groups ========== -->
+      <section id="pageGroups" style="display:none">
+        <div class="page-title">WhatsApp Groups</div>
+        <div class="card">
+          <div class="toolbar">
+            <button id="grRefreshBtn">⟳ Load Groups</button>
+            <input id="grFilter" type="text" placeholder="Search group name…" style="width:280px">
+            <div class="spacer"></div>
+          </div>
+          <div id="grList" class="muted">Click "Load Groups" to fetch from your WhatsApp.</div>
+        </div>
+
+        <div id="groupActions" class="card" style="margin-top:18px; display:none">
+          <h3 style="margin-top:0" id="gaTitle">Selected Group</h3>
+          <div class="muted" id="gaMeta" style="margin-bottom:14px"></div>
+
+          <div class="tabs">
+            <div class="tab active" data-gtab="send">Send Message</div>
+            <div class="tab" data-gtab="extract">Extract Members</div>
+          </div>
+
+          <!-- Send to group -->
+          <div id="gaSend">
+            <div class="field">
+              <label>Message</label>
+              <textarea id="gaMessage" rows="4" placeholder="Type your message…"></textarea>
+            </div>
+            <div class="field">
+              <label>Optional media</label>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+                <button id="gaPickMedia" class="secondary">📎 Choose file…</button>
+                <span id="gaMediaName" class="muted">No file attached</span>
+                <button id="gaRemoveMedia" class="secondary" style="display:none">✕ Remove</button>
+              </div>
+            </div>
+            <button id="gaSendBtn">Send to group</button>
+            <div id="gaSendMsg"></div>
+          </div>
+
+          <!-- Extract members -->
+          <div id="gaExtract" style="display:none">
+            <button id="gaExtractBtn">📋 Extract members</button>
+            <div id="gaExtractResult" style="margin-top:14px"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== Blacklist ========== -->
+      <section id="pageBlacklist" style="display:none">
+        <div class="page-title">Blacklist</div>
+        <div class="card">
+          <p class="muted">Blocked numbers are skipped automatically by the worker. Stored locally on this device.</p>
+          <div class="toolbar">
+            <input id="blPhone" type="text" placeholder="Phone (e.g. 201001234567)" style="flex:1; min-width:240px">
+            <input id="blNote" type="text" placeholder="Reason / note (optional)" style="flex:1; min-width:200px">
+            <button id="blAddBtn">+ Add</button>
+            <button id="blClearBtn" class="danger">Clear all</button>
+          </div>
+          <div id="blCount" class="muted" style="margin-bottom:10px">0 blocked</div>
+          <div style="max-height:520px; overflow-y:auto">
+            <table>
+              <thead><tr><th>Phone</th><th>Note</th><th></th></tr></thead>
+              <tbody id="blRows"><tr><td colspan="3" class="muted">No blocked numbers.</td></tr></tbody>
+            </table>
+          </div>
+
+          <div style="margin-top:24px">
+            <h3 style="margin-bottom:10px">Sent Contacts Log <span class="muted" style="font-weight:400; font-size:14px">(auto-saved)</span></h3>
+            <div class="toolbar">
+              <button id="sentRefreshBtn" class="secondary">⟳ Refresh</button>
+              <button id="sentExportBtn" class="secondary">📤 Export CSV</button>
+              <button id="sentClearBtn" class="danger">Clear log</button>
+              <span id="sentCount" class="muted" style="margin-left:auto"></span>
+            </div>
+            <div style="max-height:340px; overflow-y:auto">
+              <table>
+                <thead><tr><th>Phone</th><th>Name</th><th>When</th></tr></thead>
+                <tbody id="sentRows"><tr><td colspan="3" class="muted">Empty.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========== Group Details Modal ========== -->
+  <div id="groupModal" class="modal-backdrop" style="display:none">
+    <div class="card modal" style="width:760px; max-width:94vw">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:14px">
+        <div style="display:flex; gap:14px; align-items:center; flex:1">
+          <div class="avatar-wrap">
+            <img id="gmPic" alt="" style="display:none">
+            <div id="gmPicFallback" class="avatar-circle">👥</div>
+          </div>
+          <div style="flex:1">
+            <h3 style="margin:0" id="gmName">Group</h3>
+            <div id="gmMeta" class="muted" style="font-size:13px"></div>
+          </div>
+        </div>
+        <button id="gmClose" class="secondary" style="padding:4px 10px">✕</button>
+      </div>
+
+      <div id="gmDesc" class="muted" style="font-size:13px; padding:10px; background:var(--panel-2); border-radius:8px; margin-bottom:14px; display:none"></div>
+
+      <div class="toolbar">
+        <input id="gmFilter" type="text" placeholder="Filter members…" style="flex:1">
+        <button id="gmSelectAll" class="secondary">Select all</button>
+        <button id="gmSelectNone" class="secondary">Select none</button>
+      </div>
+
+      <div style="max-height:340px; overflow-y:auto; margin-bottom:14px">
+        <table>
+          <thead><tr><th style="width:34px"><input type="checkbox" id="gmHeadCheck" checked></th><th>Phone</th><th>Role</th></tr></thead>
+          <tbody id="gmRows"></tbody>
+        </table>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <button id="gmAddSelected">Add selected to Contacts</button>
+        <button id="gmAddAll" class="secondary">Add all members</button>
+        <span id="gmSelCount" class="muted" style="margin-left:auto; align-self:center"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Campaign Preview Modal ========== -->
+  <div id="previewModal" class="modal-backdrop" style="display:none">
+    <div class="card modal" style="width:680px; max-width:94vw">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px">
+        <h3 style="margin:0">Campaign Preview</h3>
+        <button id="pvClose" class="secondary" style="padding:4px 10px">✕</button>
+      </div>
+
+      <div class="row">
+        <div class="stat-mini"><div class="label">Recipients</div><div class="value" id="pvCount">0</div></div>
+        <div class="stat-mini"><div class="label">Speed</div><div class="value" id="pvSpeed" style="font-size:14px">—</div></div>
+        <div class="stat-mini"><div class="label">Est. duration</div><div class="value" id="pvETA" style="font-size:14px">—</div></div>
+        <div class="stat-mini"><div class="label">Has media</div><div class="value" id="pvMedia" style="font-size:14px">No</div></div>
+      </div>
+
+      <div style="margin-top:14px">
+        <label>Sample message (with first contact's variables)</label>
+        <div id="pvText" class="preview-bubble"></div>
+      </div>
+
+      <div id="pvWarn" class="banner-warn" style="display:none; margin-top:14px"></div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px">
+        <button id="pvCancel" class="secondary">Edit</button>
+        <button id="pvConfirm">✓ Confirm & Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "whatsapp-saas-admin",
+  "version": "2.0.0",
+  "description": "Static admin dashboard for WhatsApp SaaS",
+  "scripts": {
+    "start": "npx --yes serve -l 3000 .",
+    "dev":   "npx --yes serve -l 3000 ."
+  }
+}

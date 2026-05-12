@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel — WhatsApp SaaS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">📨 Admin Panel</div>
+      <div class="nav-item active" data-view="licenses">Licenses</div>
+      <div class="nav-item" data-view="campaigns">Campaigns</div>
+      <div class="footer">
+        <div id="adminEmail" style="margin-bottom:8px"></div>
+        <button id="logoutBtn" class="secondary" style="width:100%">Logout</button>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- ===== Licenses view ===== -->
+      <section id="viewLicenses">
+        <div class="page-title">License Management</div>
+
+        <div class="stats" id="stats">
+          <div class="stat-card"><div class="label">Total</div><div class="value" id="stTotal">—</div></div>
+          <div class="stat-card green"><div class="label">Active</div><div class="value" id="stActive">—</div></div>
+          <div class="stat-card gray"><div class="label">Inactive</div><div class="value" id="stInactive">—</div></div>
+          <div class="stat-card amber"><div class="label">Expired</div><div class="value" id="stExpired">—</div></div>
+          <div class="stat-card red"><div class="label">Revoked</div><div class="value" id="stRevoked">—</div></div>
+          <div class="stat-card blue"><div class="label">Campaigns</div><div class="value" id="stCampaigns">—</div></div>
+        </div>
+
+        <div class="toolbar">
+          <input id="searchEl" type="text" placeholder="Search key, customer, email…">
+          <select id="filterStatus">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="expired">Expired</option>
+            <option value="revoked">Revoked</option>
+          </select>
+          <button class="secondary" id="refreshBtn">⟳ Refresh</button>
+          <div class="spacer"></div>
+          <button id="newLicenseBtn">+ New License</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>License Key</th><th>Customer</th><th>Plan</th>
+              <th>Status</th><th>Device</th><th>Expires</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="7" style="color:#6b7587">Loading…</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===== Campaigns view ===== -->
+      <section id="viewCampaigns" style="display:none">
+        <div class="page-title">All Campaigns</div>
+        <div class="toolbar">
+          <input id="campFilter" type="text" placeholder="Filter by license key (e.g. WA-...)">
+          <button class="secondary" id="campRefreshBtn">⟳ Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Campaign</th><th>License</th><th>Status</th>
+              <th>Progress</th><th>Today</th><th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="campRows">
+            <tr><td colspan="6" style="color:#6b7587">Loading…</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- New license modal -->
+  <div id="newModal" class="modal-backdrop" style="display:none">
+    <div class="card modal">
+      <h3 style="margin-top:0">Create New License(s)</h3>
+      <div class="row">
+        <div class="field">
+          <label>Customer name</label>
+          <input id="newCustName" type="text" placeholder="Acme Inc.">
+        </div>
+        <div class="field">
+          <label>Customer email</label>
+          <input id="newCustEmail" type="email" placeholder="ops@acme.com">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Plan</label>
+          <select id="newPlan">
+            <option value="basic">Basic</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Days valid</label>
+          <input id="newDays" type="number" value="30" min="1">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Daily message limit</label>
+          <input id="newLimit" type="number" value="500" min="0">
+        </div>
+        <div class="field">
+          <label>How many?</label>
+          <input id="newCount" type="number" value="1" min="1" max="100">
+        </div>
+      </div>
+      <div class="field">
+        <label>Notes (optional)</label>
+        <input id="newNotes" type="text" placeholder="e.g. invoice #123">
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end">
+        <button class="secondary" id="cancelNew">Cancel</button>
+        <button id="confirmNew">Create</button>
+      </div>
+      <div id="newMsg"></div>
+    </div>
+  </div>
+
+  <!-- Created keys modal -->
+  <div id="createdModal" class="modal-backdrop" style="display:none">
+    <div class="card modal">
+      <h3 style="margin-top:0">License(s) Created</h3>
+      <p style="color:#6b7587">Save these keys — they will only be shown clearly here.</p>
+      <div id="createdList"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px">
+        <button id="closeCreated">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <title>Activate License</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="card login-card">
+      <div class="brand">📨 WhatsApp Campaign Pro</div>
+      <div class="subtitle">Enter your license key to activate this device.</div>
+
+      <div class="field">
+        <label>Server URL</label>
+        <input id="serverUrl" type="text" placeholder="https://api.yourdomain.com">
+      </div>
+
+      <div class="field">
+        <label>License Key</label>
+        <input id="licenseKey" type="text" placeholder="WA-XXXX-XXXX-XXXX-XXXX" autofocus>
+      </div>
+
+      <div class="field">
+        <label>Device Fingerprint (read-only)</label>
+        <input id="fingerprint" type="text" readonly>
+      </div>
+
+      <button id="activateBtn" style="width:100%">Activate</button>
+      <div id="msg"></div>
+    </div>
+  </div>
+
+  <script src="login.js"></script>
+</body>
+</html>
