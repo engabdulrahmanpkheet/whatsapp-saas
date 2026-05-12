@@ -28,4 +28,8 @@ const sessionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Hot lookups: by tenant, and by status for the boot-restore scan.
+sessionSchema.index({ license_key: 1, status: 1 });
+sessionSchema.index({ status: 1, updatedAt: -1 });
+
 module.exports = mongoose.model('Session', sessionSchema);

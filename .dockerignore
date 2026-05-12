@@ -1,0 +1,50 @@
+# Docker build context exclusions.
+# Keeps images small and prevents secrets / dev artefacts leaking into the
+# layer cache.
+
+# vcs
+.git
+.gitignore
+.gitattributes
+
+# editor / os
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# node
+node_modules
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env + secrets
+.env
+.env.*
+**/.env
+**/.env.*
+
+# tests / coverage
+coverage
+.nyc_output
+*.test.js
+*.spec.js
+
+# build artefacts
+dist
+build
+out
+
+# desktop client — not shipped in server image
+client-desktop
+admin-dashboard
+
+# CI + docs that don't affect runtime
+.github
+*.md
+!server/README.md
+
+# baileys local auth (production uses Mongo store)
+server/.wa-auth

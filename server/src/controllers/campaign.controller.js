@@ -4,6 +4,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const env = require('../config/env');
 const Campaign = require('../models/campaign.model');
 const queue = require('../services/queue.service');
+const worker = require('../services/campaign.worker');
 const { bad, notFound } = require('../utils/AppError');
 const { normalize: normalizePhone } = require('../utils/phone');
 
@@ -127,6 +128,9 @@ exports.start = asyncHandler(async (req, res) => {
     status: 'queued',
   });
 
+  // Kick off the server-side worker. Idempotent — safe to call repeatedly.
+  worker.ensureWorker(campaign._id, license.license_key);
+
   res.status(201).json({ ok: true, campaign: summary(campaign) });
 });
 
@@ -179,6 +183,9 @@ exports.updateStatus = asyncHandler(async (req, res) => {
     { new: true }
   );
   if (!c) throw notFound('Campaign not found');
+  // Resume worker on un-pause; the running worker will naturally back off
+  // when it sees `paused` so we don't need to call stop() here.
+  if (status !== 'paused') worker.ensureWorker(c._id, c.license_key);
   res.json({ ok: true, campaign: summary(c) });
 });
 
@@ -211,6 +218,7 @@ exports.remove = asyncHandler(async (req, res) => {
     license_key: req.license.license_key,
   });
   if (!r.deletedCount) throw notFound('Campaign not found');
+  worker.stopWorker(req.params.id);
   res.json({ ok: true });
 });
 

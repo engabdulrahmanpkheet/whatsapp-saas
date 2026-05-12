@@ -18,18 +18,30 @@ const logger = require('./utils/logger');
 const { applySecurity } = require('./middleware/security');
 const { globalLimiter } = require('./middleware/rateLimit');
 const { notFoundHandler, errorHandler } = require('./middleware/error');
+const requestId = require('./middleware/requestId');
 const routes = require('./routes');
+
+// Morgan token for the correlation id we attached in requestId middleware.
+morgan.token('rid', (req) => req.id || '-');
 
 function buildApp() {
   const app = express();
 
   applySecurity(app);
 
+  // Correlation id BEFORE anything else so all logs / errors carry it.
+  app.use(requestId);
+
   // Per-request timeout — protects the event loop from hung downstreams.
   app.use((req, res, next) => {
     req.setTimeout(env.REQUEST_TIMEOUT_MS, () => {
       if (!res.headersSent) {
-        res.status(503).json({ ok: false, error: 'Request timeout', code: 'TIMEOUT' });
+        res.status(503).json({
+          ok: false,
+          error: 'Request timeout',
+          code: 'TIMEOUT',
+          request_id: req.id,
+        });
       }
     });
     next();
@@ -39,10 +51,10 @@ function buildApp() {
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
   if (!env.isProd) {
-    app.use(morgan('dev'));
+    app.use(morgan(':method :url :status :response-time ms rid=:rid'));
   } else {
     app.use(
-      morgan('combined', {
+      morgan(':method :url :status :response-time ms rid=:rid', {
         stream: { write: (line) => logger.info({ http: line.trim() }) },
       })
     );

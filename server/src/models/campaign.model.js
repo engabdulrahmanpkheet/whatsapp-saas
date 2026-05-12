@@ -96,4 +96,10 @@ campaignSchema.pre('save', function (next) {
   next();
 });
 
+// Compound indexes for the hot queries the queue worker runs.
+// - listing by tenant + status:
+campaignSchema.index({ license_key: 1, status: 1, createdAt: -1 });
+// - the atomic claim filter (status + nested contact status):
+campaignSchema.index({ status: 1, 'contacts.status': 1 });
+
 module.exports = mongoose.model('Campaign', campaignSchema);

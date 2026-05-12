@@ -20,6 +20,7 @@ const logger = require('./utils/logger');
 const { connectDB, disconnectDB, isHealthy } = require('./config/db');
 const manager = require('./whatsapp/manager');
 const SessionModel = require('./models/session.model');
+const campaignWorker = require('./services/campaign.worker');
 const buildApp = require('./app');
 
 // ---------- global crash protection ----------
@@ -46,6 +47,24 @@ function startupBanner() {
     },
     'starting WhatsApp SaaS API'
   );
+}
+
+async function resumeCampaignWorkersAsync() {
+  // Wait for Mongo, then scan for in-flight campaigns and re-attach workers.
+  for (let i = 0; i < 30; i++) {
+    if (isHealthy()) break;
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  if (!isHealthy()) {
+    logger.warn('mongo not ready — skipping campaign worker resume');
+    return;
+  }
+  try {
+    const count = await campaignWorker.resumeOnBoot();
+    if (count) logger.info({ count }, 'campaign workers resumed');
+  } catch (err) {
+    logger.warn({ err: err.message }, 'campaign resume failed (non-fatal)');
+  }
 }
 
 async function restoreSessionsAsync() {
@@ -112,6 +131,12 @@ function main() {
     logger.warn({ err: err.message }, 'session restoration crashed (non-fatal)')
   );
 
+  // 5. Resume in-flight campaigns: any campaign with pending contacts gets a
+  // worker reattached so it keeps making progress after a redeploy.
+  resumeCampaignWorkersAsync().catch((err) =>
+    logger.warn({ err: err.message }, 'campaign worker resume crashed (non-fatal)')
+  );
+
   // ---------- graceful shutdown ----------
   let shuttingDown = false;
   async function shutdown(signal) {
@@ -125,6 +150,11 @@ function main() {
       process.exit(0);
     }, 15_000).unref();
 
+    try {
+      campaignWorker.stopAll();
+    } catch (e) {
+      logger.warn({ err: e.message }, 'campaign worker stop error');
+    }
     try {
       await manager.shutdownAll();
     } catch (e) {

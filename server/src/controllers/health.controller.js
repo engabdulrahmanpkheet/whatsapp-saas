@@ -16,11 +16,11 @@ const { isHealthy, lastErrorMessage } = require('../config/db');
 const manager = require('../whatsapp/manager');
 
 exports.root = (_req, res) => {
-  res.status(200).send('API is running 🚀');
+  res.status(200).type('text/plain').send('API is running 🚀');
 };
 
 exports.healthz = (_req, res) => {
-  res.status(200).send('OK');
+  res.status(200).type('text/plain').send('OK');
 };
 
 exports.healthzJson = (_req, res) => {

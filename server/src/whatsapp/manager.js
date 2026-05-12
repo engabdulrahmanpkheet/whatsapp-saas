@@ -259,26 +259,59 @@ class WhatsAppManager extends EventEmitter {
     };
   }
 
-  async sendText(sessionId, phone, text) {
-    const s = this.sessions.get(sessionId);
-    if (!s || s.status !== 'connected' || !s.sock) {
-      throw new Error('session_not_connected');
-    }
-    const jid = toJid(phone);
-    if (!jid) throw new Error('invalid_phone');
-    return s.sock.sendMessage(jid, { text: String(text || '') });
+  async sendText(sessionId, phone, text, opts = {}) {
+    return this._serialSend(sessionId, phone, async (sock, jid) => {
+      if (opts.simulateTyping !== false) {
+        await this._simulateTyping(sock, jid, String(text || ''));
+      }
+      return sock.sendMessage(jid, { text: String(text || '') });
+    });
   }
 
-  async sendMedia(sessionId, phone, media) {
+  async sendMedia(sessionId, phone, media, opts = {}) {
+    return this._serialSend(sessionId, phone, async (sock, jid) => {
+      const payload = buildMediaMessage(media);
+      if (opts.simulateTyping !== false && payload.caption) {
+        await this._simulateTyping(sock, jid, payload.caption);
+      }
+      return sock.sendMessage(jid, payload);
+    });
+  }
+
+  /**
+   * Serialise sends per session: WhatsApp doesn't like racing socket writes
+   * and concurrent sendMessage calls can corrupt ratchet state. We chain all
+   * sends through a single promise per session.
+   */
+  _serialSend(sessionId, phone, fn) {
     const s = this.sessions.get(sessionId);
     if (!s || s.status !== 'connected' || !s.sock) {
-      throw new Error('session_not_connected');
+      return Promise.reject(new Error('session_not_connected'));
     }
     const jid = toJid(phone);
-    if (!jid) throw new Error('invalid_phone');
+    if (!jid) return Promise.reject(new Error('invalid_phone'));
 
-    const payload = buildMediaMessage(media);
-    return s.sock.sendMessage(jid, payload);
+    const prev = s.sendChain || Promise.resolve();
+    const next = prev.catch(() => {}).then(() => fn(s.sock, jid));
+    s.sendChain = next;
+    return next;
+  }
+
+  /**
+   * Trigger a "typing" presence with duration scaled to text length.
+   * Capped between 800 ms (very short msg) and 4 s (long msg). The presence
+   * update is best-effort — if it fails we still send.
+   */
+  async _simulateTyping(sock, jid, text) {
+    try {
+      const len = String(text || '').length;
+      const ms = Math.max(800, Math.min(4_000, 600 + len * 30));
+      await sock.sendPresenceUpdate('composing', jid).catch(() => {});
+      await new Promise((r) => setTimeout(r, ms));
+      await sock.sendPresenceUpdate('paused', jid).catch(() => {});
+    } catch {
+      /* ignore — best effort */
+    }
   }
 
   async logout(sessionId) {

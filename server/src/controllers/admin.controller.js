@@ -8,7 +8,11 @@ const License = require('../models/license.model');
 const Campaign = require('../models/campaign.model');
 const SessionModel = require('../models/session.model');
 const { createLicense } = require('../services/license.service');
-const { bad, unauthorized, notFound, AppError } = require('../utils/AppError');
+const { bad, unauthorized, notFound, forbidden, AppError } = require('../utils/AppError');
+
+// Lockout policy: 5 failures → 15 min lock. Resets on any successful login.
+const LOGIN_FAIL_LIMIT = 5;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
 exports.login = asyncHandler(async (req, res) => {
   if (!env.ADMIN_JWT_SECRET) {
@@ -18,16 +22,39 @@ exports.login = asyncHandler(async (req, res) => {
   if (!email || !password) throw bad('email and password required');
 
   const admin = await Admin.findOne({ email: String(email).toLowerCase().trim() });
+  // Generic message — don't leak whether the email exists.
   if (!admin) throw unauthorized('Invalid credentials');
 
+  if (admin.isLocked()) {
+    const minutes = Math.ceil((admin.locked_until.getTime() - Date.now()) / 60_000);
+    throw forbidden(`Account locked. Try again in ${minutes} minute(s).`, 'ACCOUNT_LOCKED');
+  }
+
   const ok = await admin.verifyPassword(password);
-  if (!ok) throw unauthorized('Invalid credentials');
+  if (!ok) {
+    admin.failed_login_count = (admin.failed_login_count || 0) + 1;
+    if (admin.failed_login_count >= LOGIN_FAIL_LIMIT) {
+      admin.locked_until = new Date(Date.now() + LOGIN_LOCK_MS);
+      admin.failed_login_count = 0;
+    }
+    await admin.save();
+    throw unauthorized('Invalid credentials');
+  }
 
   admin.last_login_at = new Date();
+  admin.failed_login_count = 0;
+  admin.locked_until = null;
   await admin.save();
 
   const token = jwt.sign(
-    { adminId: admin._id.toString(), email: admin.email, role: admin.role },
+    {
+      adminId: admin._id.toString(),
+      email: admin.email,
+      role: admin.role,
+      // Standard JWT claims so future verifiers can pin the audience/issuer.
+      iss: 'whatsapp-saas-api',
+      aud: 'admin',
+    },
     env.ADMIN_JWT_SECRET,
     { expiresIn: env.ADMIN_JWT_EXPIRES_IN }
   );
